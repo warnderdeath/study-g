@@ -35,8 +35,16 @@ const TimerScreen = () => {
     });
 
     loadData();
+    return () => {
+      unsubscribe();
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [navigation]);
 
-    // Web: Handle page close/refresh when timer is running
+  // Separate effect for web page close/visibility handling
+  useEffect(() => {
     if (Platform.OS === 'web') {
       const handleBeforeUnload = (e: BeforeUnloadEvent) => {
         if (isRunning && currentSession) {
@@ -61,22 +69,11 @@ const TimerScreen = () => {
       document.addEventListener('visibilitychange', handleVisibilityChange);
 
       return () => {
-        unsubscribe();
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-        }
         window.removeEventListener('beforeunload', handleBeforeUnload);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       };
     }
-
-    return () => {
-      unsubscribe();
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [navigation, isRunning, currentSession]);
+  }, [isRunning, currentSession]);
 
   useEffect(() => {
     if (isRunning) {
