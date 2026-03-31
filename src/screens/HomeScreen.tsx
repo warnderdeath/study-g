@@ -7,10 +7,12 @@ import {
   Modal,
   TouchableOpacity,
   Dimensions,
+  Platform,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../constants/theme';
-import { getExams, getCourses } from '../services/storage';
+import { getExams, getCourses, clearAnalyticsData } from '../services/storage';
 import { Exam, Course } from '../types';
 import { isExamToday, getDaysUntilExam, getExamCountdownText } from '../utils/dateUtils';
 
@@ -69,6 +71,40 @@ const HomeScreen = () => {
     setShowExamModal(false);
   };
 
+  const handleClearAnalytics = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Tüm çalışma analizi verilerini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) {
+        clearAnalyticsData()
+          .then(() => {
+            alert('Analiz verileri temizlendi!');
+          })
+          .catch((error) => {
+            alert('Hata oluştu: ' + error.message);
+          });
+      }
+    } else {
+      Alert.alert(
+        'Analiz Verilerini Temizle',
+        'Tüm çalışma analizi verilerini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.',
+        [
+          { text: 'İptal', style: 'cancel' },
+          {
+            text: 'Temizle',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await clearAnalyticsData();
+                Alert.alert('Başarılı', 'Analiz verileri temizlendi!');
+              } catch (error: any) {
+                Alert.alert('Hata', error.message);
+              }
+            },
+          },
+        ]
+      );
+    }
+  };
+
   const nextExam = upcomingExams[0];
   const daysUntilNext = nextExam ? getDaysUntilExam(nextExam.date) : null;
 
@@ -98,10 +134,18 @@ const HomeScreen = () => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeText}>Hoş Geldin</Text>
-          <Text style={styles.appName}>Study-G</Text>
-          <View style={styles.divider} />
+          <View>
+            <Text style={styles.welcomeText}>Hoş Geldin</Text>
+            <Text style={styles.appName}>Study-G</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.clearButton}
+            onPress={handleClearAnalytics}
+          >
+            <Text style={styles.clearButtonText}>🗑️</Text>
+          </TouchableOpacity>
         </View>
+        <View style={styles.divider} />
 
         {/* Next Exam Countdown */}
         {nextExam && (
@@ -227,7 +271,10 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   welcomeSection: {
-    marginBottom: spacing.xl,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
   },
   welcomeText: {
     fontSize: fontSize.lg,
@@ -238,11 +285,24 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xxxl,
     fontWeight: fontWeight.bold,
     color: colors.primary,
-    marginBottom: spacing.md,
+  },
+  clearButton: {
+    backgroundColor: colors.surface,
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.round,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.error + '30',
+  },
+  clearButtonText: {
+    fontSize: 20,
   },
   divider: {
     height: 2,
     width: 60,
+    marginBottom: spacing.xl,
     backgroundColor: colors.primary,
   },
   countdownCard: {

@@ -319,6 +319,21 @@ function reviver(key: string, value: any) {
   return value;
 }
 
+// Clear analytics data (study sessions only)
+export const clearAnalyticsData = async (): Promise<void> => {
+  try {
+    if (Platform.OS === 'web') {
+      localStorage.removeItem(KEYS.SESSIONS);
+      localStorage.removeItem(KEYS.ACTIVE_SESSION);
+    } else {
+      await AsyncStorage.multiRemove([KEYS.SESSIONS, KEYS.ACTIVE_SESSION]);
+    }
+  } catch (error) {
+    console.error('Error clearing analytics data:', error);
+    throw error;
+  }
+};
+
 // Clear all data (for testing)
 export const clearAllData = async (): Promise<void> => {
   try {
