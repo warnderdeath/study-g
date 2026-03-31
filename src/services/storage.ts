@@ -1,5 +1,30 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { Note, Exam, StudySession, Course, ScheduleEntry } from '../types';
+
+// Platform-specific storage wrapper
+const storage = {
+  getItem: async (key: string): Promise<string | null> => {
+    if (Platform.OS === 'web') {
+      return localStorage.getItem(key);
+    }
+    return await storage.getItem(key);
+  },
+  setItem: async (key: string, value: string): Promise<void> => {
+    if (Platform.OS === 'web') {
+      localStorage.setItem(key, value);
+    } else {
+      await storage.setItem(key, value);
+    }
+  },
+  removeItem: async (key: string): Promise<void> => {
+    if (Platform.OS === 'web') {
+      localStorage.removeItem(key);
+    } else {
+      await AsyncStorage.removeItem(key);
+    }
+  },
+};
 
 // Storage Keys
 const KEYS = {
@@ -14,7 +39,7 @@ const KEYS = {
 // Notes Storage
 export const getNotes = async (): Promise<Note[]> => {
   try {
-    const data = await AsyncStorage.getItem(KEYS.NOTES);
+    const data = await storage.getItem(KEYS.NOTES);
     return data ? JSON.parse(data, reviver) : [];
   } catch (error) {
     console.error('Error loading notes:', error);
@@ -33,7 +58,7 @@ export const saveNote = async (note: Note): Promise<void> => {
       notes.push(note);
     }
 
-    await AsyncStorage.setItem(KEYS.NOTES, JSON.stringify(notes));
+    await storage.setItem(KEYS.NOTES, JSON.stringify(notes));
   } catch (error) {
     console.error('Error saving note:', error);
     throw error;
@@ -44,7 +69,7 @@ export const deleteNote = async (noteId: string): Promise<void> => {
   try {
     const notes = await getNotes();
     const filtered = notes.filter(n => n.id !== noteId);
-    await AsyncStorage.setItem(KEYS.NOTES, JSON.stringify(filtered));
+    await storage.setItem(KEYS.NOTES, JSON.stringify(filtered));
   } catch (error) {
     console.error('Error deleting note:', error);
     throw error;
@@ -54,7 +79,7 @@ export const deleteNote = async (noteId: string): Promise<void> => {
 // Exams Storage
 export const getExams = async (): Promise<Exam[]> => {
   try {
-    const data = await AsyncStorage.getItem(KEYS.EXAMS);
+    const data = await storage.getItem(KEYS.EXAMS);
     return data ? JSON.parse(data, reviver) : [];
   } catch (error) {
     console.error('Error loading exams:', error);
@@ -73,7 +98,7 @@ export const saveExam = async (exam: Exam): Promise<void> => {
       exams.push(exam);
     }
 
-    await AsyncStorage.setItem(KEYS.EXAMS, JSON.stringify(exams));
+    await storage.setItem(KEYS.EXAMS, JSON.stringify(exams));
   } catch (error) {
     console.error('Error saving exam:', error);
     throw error;
@@ -84,7 +109,7 @@ export const deleteExam = async (examId: string): Promise<void> => {
   try {
     const exams = await getExams();
     const filtered = exams.filter(e => e.id !== examId);
-    await AsyncStorage.setItem(KEYS.EXAMS, JSON.stringify(filtered));
+    await storage.setItem(KEYS.EXAMS, JSON.stringify(filtered));
   } catch (error) {
     console.error('Error deleting exam:', error);
     throw error;
@@ -94,7 +119,7 @@ export const deleteExam = async (examId: string): Promise<void> => {
 // Study Sessions Storage
 export const getSessions = async (): Promise<StudySession[]> => {
   try {
-    const data = await AsyncStorage.getItem(KEYS.SESSIONS);
+    const data = await storage.getItem(KEYS.SESSIONS);
     return data ? JSON.parse(data, reviver) : [];
   } catch (error) {
     console.error('Error loading sessions:', error);
@@ -113,7 +138,7 @@ export const saveSession = async (session: StudySession): Promise<void> => {
       sessions.push(session);
     }
 
-    await AsyncStorage.setItem(KEYS.SESSIONS, JSON.stringify(sessions));
+    await storage.setItem(KEYS.SESSIONS, JSON.stringify(sessions));
   } catch (error) {
     console.error('Error saving session:', error);
     throw error;
@@ -122,7 +147,7 @@ export const saveSession = async (session: StudySession): Promise<void> => {
 
 export const getActiveSession = async (): Promise<StudySession | null> => {
   try {
-    const data = await AsyncStorage.getItem(KEYS.ACTIVE_SESSION);
+    const data = await storage.getItem(KEYS.ACTIVE_SESSION);
     return data ? JSON.parse(data, reviver) : null;
   } catch (error) {
     console.error('Error loading active session:', error);
@@ -133,7 +158,7 @@ export const getActiveSession = async (): Promise<StudySession | null> => {
 export const setActiveSession = async (session: StudySession | null): Promise<void> => {
   try {
     if (session) {
-      await AsyncStorage.setItem(KEYS.ACTIVE_SESSION, JSON.stringify(session));
+      await storage.setItem(KEYS.ACTIVE_SESSION, JSON.stringify(session));
     } else {
       await AsyncStorage.removeItem(KEYS.ACTIVE_SESSION);
     }
@@ -161,9 +186,9 @@ const DEFAULT_COURSES: Course[] = [
 // Initialize courses with default data if empty
 const initializeCoursesIfNeeded = async (): Promise<void> => {
   try {
-    const data = await AsyncStorage.getItem(KEYS.COURSES);
+    const data = await storage.getItem(KEYS.COURSES);
     if (!data) {
-      await AsyncStorage.setItem(KEYS.COURSES, JSON.stringify(DEFAULT_COURSES));
+      await storage.setItem(KEYS.COURSES, JSON.stringify(DEFAULT_COURSES));
     }
   } catch (error) {
     console.error('Error initializing courses:', error);
@@ -174,7 +199,7 @@ const initializeCoursesIfNeeded = async (): Promise<void> => {
 export const getCourses = async (): Promise<Course[]> => {
   try {
     await initializeCoursesIfNeeded();
-    const data = await AsyncStorage.getItem(KEYS.COURSES);
+    const data = await storage.getItem(KEYS.COURSES);
     return data ? JSON.parse(data) : DEFAULT_COURSES;
   } catch (error) {
     console.error('Error loading courses:', error);
@@ -193,7 +218,7 @@ export const saveCourse = async (course: Course): Promise<void> => {
       courses.push(course);
     }
 
-    await AsyncStorage.setItem(KEYS.COURSES, JSON.stringify(courses));
+    await storage.setItem(KEYS.COURSES, JSON.stringify(courses));
   } catch (error) {
     console.error('Error saving course:', error);
     throw error;
@@ -204,7 +229,7 @@ export const deleteCourse = async (courseId: string): Promise<void> => {
   try {
     const courses = await getCourses();
     const filtered = courses.filter(c => c.id !== courseId);
-    await AsyncStorage.setItem(KEYS.COURSES, JSON.stringify(filtered));
+    await storage.setItem(KEYS.COURSES, JSON.stringify(filtered));
   } catch (error) {
     console.error('Error deleting course:', error);
     throw error;
@@ -233,9 +258,9 @@ const DEFAULT_SCHEDULE: ScheduleEntry[] = [
 // Initialize schedule with default data if empty
 const initializeScheduleIfNeeded = async (): Promise<void> => {
   try {
-    const data = await AsyncStorage.getItem(KEYS.SCHEDULE);
+    const data = await storage.getItem(KEYS.SCHEDULE);
     if (!data) {
-      await AsyncStorage.setItem(KEYS.SCHEDULE, JSON.stringify(DEFAULT_SCHEDULE));
+      await storage.setItem(KEYS.SCHEDULE, JSON.stringify(DEFAULT_SCHEDULE));
     }
   } catch (error) {
     console.error('Error initializing schedule:', error);
@@ -246,7 +271,7 @@ const initializeScheduleIfNeeded = async (): Promise<void> => {
 export const getSchedule = async (): Promise<ScheduleEntry[]> => {
   try {
     await initializeScheduleIfNeeded();
-    const data = await AsyncStorage.getItem(KEYS.SCHEDULE);
+    const data = await storage.getItem(KEYS.SCHEDULE);
     return data ? JSON.parse(data) : DEFAULT_SCHEDULE;
   } catch (error) {
     console.error('Error loading schedule:', error);
@@ -265,7 +290,7 @@ export const saveScheduleEntry = async (entry: ScheduleEntry): Promise<void> => 
       schedule.push(entry);
     }
 
-    await AsyncStorage.setItem(KEYS.SCHEDULE, JSON.stringify(schedule));
+    await storage.setItem(KEYS.SCHEDULE, JSON.stringify(schedule));
   } catch (error) {
     console.error('Error saving schedule entry:', error);
     throw error;
@@ -276,7 +301,7 @@ export const deleteScheduleEntry = async (entryId: string): Promise<void> => {
   try {
     const schedule = await getSchedule();
     const filtered = schedule.filter(e => e.id !== entryId);
-    await AsyncStorage.setItem(KEYS.SCHEDULE, JSON.stringify(filtered));
+    await storage.setItem(KEYS.SCHEDULE, JSON.stringify(filtered));
   } catch (error) {
     console.error('Error deleting schedule entry:', error);
     throw error;
@@ -297,14 +322,20 @@ function reviver(key: string, value: any) {
 // Clear all data (for testing)
 export const clearAllData = async (): Promise<void> => {
   try {
-    await AsyncStorage.multiRemove([
+    const allKeys = [
       KEYS.NOTES,
       KEYS.EXAMS,
       KEYS.SESSIONS,
       KEYS.COURSES,
       KEYS.ACTIVE_SESSION,
       KEYS.SCHEDULE,
-    ]);
+    ];
+
+    if (Platform.OS === 'web') {
+      allKeys.forEach(key => localStorage.removeItem(key));
+    } else {
+      await AsyncStorage.multiRemove(allKeys);
+    }
   } catch (error) {
     console.error('Error clearing data:', error);
     throw error;
