@@ -111,7 +111,19 @@ const TimerScreen = () => {
     const allCourses = await getCourses();
     setCourses(allCourses);
 
-    // Check for active session
+    // WEB FIX: On web, if there's an active session, it means the page was refreshed or closed
+    // while timer was running. We should NOT restore it - just clear it.
+    if (Platform.OS === 'web') {
+      const activeSession = await getActiveSession();
+      if (activeSession) {
+        // Clear the orphaned session
+        await setActiveSession(null);
+      }
+      // Don't restore the timer on web
+      return;
+    }
+
+    // On mobile, we can safely restore active sessions
     const activeSession = await getActiveSession();
     if (activeSession) {
       setCurrentSession(activeSession);
