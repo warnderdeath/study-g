@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   FlatList,
   Alert,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../constants/theme';
@@ -34,13 +35,48 @@ const TimerScreen = () => {
     });
 
     loadData();
+
+    // Web: Handle page close/refresh when timer is running
+    if (Platform.OS === 'web') {
+      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        if (isRunning && currentSession) {
+          e.preventDefault();
+          e.returnValue = 'Sayaç çalışıyor! Sayfayı kapatırsanız çalışma süresi sıfırlanacaktır.';
+          return e.returnValue;
+        }
+      };
+
+      const handleVisibilityChange = async () => {
+        if (document.hidden && isRunning && currentSession) {
+          // Tab/window closed or minimized while timer running
+          // Reset timer
+          await setActiveSession(null);
+          setIsRunning(false);
+          setDuration(0);
+          setCurrentSession(null);
+        }
+      };
+
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      return () => {
+        unsubscribe();
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    }
+
     return () => {
       unsubscribe();
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [navigation]);
+  }, [navigation, isRunning, currentSession]);
 
   useEffect(() => {
     if (isRunning) {
