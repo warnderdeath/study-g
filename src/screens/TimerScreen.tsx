@@ -48,8 +48,8 @@ const TimerScreen = () => {
     if (Platform.OS === 'web') {
       const handleBeforeUnload = (e: BeforeUnloadEvent) => {
         if (isRunning && currentSession) {
-          // Reset timer immediately when page is being closed
-          setActiveSession(null).catch(console.error);
+          // CRITICAL: Use localStorage directly (synchronous) instead of async setActiveSession
+          localStorage.removeItem('@studyg_activeSession');
 
           e.preventDefault();
           e.returnValue = 'Sayaç çalışıyor! Sayfayı kapatırsanız çalışma süresi sıfırlanacaktır.';
@@ -60,8 +60,8 @@ const TimerScreen = () => {
       const handleVisibilityChange = () => {
         if (document.hidden && isRunning && currentSession) {
           // Tab/window minimized or switched while timer running
-          // Reset timer immediately
-          setActiveSession(null).catch(console.error);
+          // Reset timer immediately using localStorage directly
+          localStorage.removeItem('@studyg_activeSession');
           setIsRunning(false);
           setDuration(0);
           setCurrentSession(null);
@@ -72,8 +72,8 @@ const TimerScreen = () => {
       const handlePageHide = () => {
         // Page is being unloaded (navigating away, closing tab/window)
         if (isRunning && currentSession) {
-          // Force reset timer
-          setActiveSession(null).catch(console.error);
+          // CRITICAL: Use localStorage directly for immediate removal
+          localStorage.removeItem('@studyg_activeSession');
         }
       };
 
