@@ -13,8 +13,9 @@ import {
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../constants/theme';
 import { jsPDF } from 'jspdf';
 
-// OCR.space API - Get free key at https://ocr.space/ocrapi
+// OCR.space API
 const OCR_API_URL = 'https://api.ocr.space/parse/image';
+const DEFAULT_API_KEY = 'K82740862688957';
 
 interface ImageItem {
   id: string;
@@ -34,13 +35,17 @@ const PDFConverterScreen = () => {
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load API key from localStorage on mount
+  // Load API key from localStorage on mount, or use default
   React.useEffect(() => {
     if (Platform.OS === 'web') {
       const savedKey = localStorage.getItem('@studyg_ocr_api_key');
       if (savedKey) {
         setApiKey(savedKey);
+      } else {
+        setApiKey(DEFAULT_API_KEY);
       }
+    } else {
+      setApiKey(DEFAULT_API_KEY);
     }
   }, []);
 
