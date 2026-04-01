@@ -12,6 +12,7 @@ import ExamsScreen from '../screens/ExamsScreen';
 import StatsScreen from '../screens/StatsScreen';
 import CoursesScreen from '../screens/CoursesScreen';
 import ScheduleScreen from '../screens/ScheduleScreen';
+import PDFConverterScreen from '../screens/PDFConverterScreen';
 
 export type RootTabParamList = {
   Home: undefined;
@@ -21,6 +22,7 @@ export type RootTabParamList = {
   Timer: undefined;
   Exams: undefined;
   Stats: undefined;
+  PDFConverter: undefined;
 };
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -121,6 +123,15 @@ const AppNavigator = () => {
             title: 'İstatistikler',
             tabBarLabel: 'Analiz',
             tabBarIcon: ({ focused }) => <TabIcon name="📊" focused={focused} />,
+          }}
+        />
+        <Tab.Screen
+          name="PDFConverter"
+          component={PDFConverterScreen}
+          options={{
+            title: 'PDF Dönüştürücü',
+            tabBarLabel: 'PDF',
+            tabBarIcon: ({ focused }) => <TabIcon name="📄" focused={focused} />,
           }}
         />
       </Tab.Navigator>
