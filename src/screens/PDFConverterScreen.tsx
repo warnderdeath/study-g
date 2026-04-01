@@ -318,13 +318,14 @@ const PDFConverterScreen = () => {
               </View>
             ))}
 
-            {/* Process All Button */}
-            {hasUnprocessed && !isAnyProcessing && (
+            {/* Process All Button - Show when multiple images and at least one unprocessed */}
+            {images.length >= 1 && hasUnprocessed && !isAnyProcessing && (
               <TouchableOpacity
                 style={styles.processAllButton}
                 onPress={processAllImages}
               >
-                <Text style={styles.processAllButtonText}>Tümünü İşle</Text>
+                <Text style={styles.processAllButtonIcon}>🔍</Text>
+                <Text style={styles.processAllButtonText}>Tüm Metinleri Çıkar ({images.filter(img => !img.isProcessed).length} görsel)</Text>
               </TouchableOpacity>
             )}
 
@@ -343,8 +344,8 @@ const PDFConverterScreen = () => {
               </View>
             )}
 
-            {/* Generate PDF Button */}
-            {allProcessed && (
+            {/* Generate PDF Button - Show when at least one image is processed */}
+            {images.some(img => img.isProcessed && img.extractedText) && (
               <TouchableOpacity
                 style={[styles.generateButton, isGeneratingPDF && styles.generateButtonDisabled]}
                 onPress={generatePDF}
@@ -515,16 +516,23 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold,
   },
   processAllButton: {
-    backgroundColor: colors.secondary,
-    padding: spacing.md,
+    flexDirection: 'row',
+    backgroundColor: colors.primary,
+    padding: spacing.lg,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
-    marginTop: spacing.sm,
+    justifyContent: 'center',
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  processAllButtonIcon: {
+    fontSize: 20,
   },
   processAllButtonText: {
     color: colors.onPrimary,
     fontSize: fontSize.md,
-    fontWeight: fontWeight.semiBold,
+    fontWeight: fontWeight.bold,
   },
   previewSection: {
     marginTop: spacing.lg,
