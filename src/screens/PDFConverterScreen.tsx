@@ -8,15 +8,19 @@ import {
   Image,
   Platform,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../constants/theme';
-import Tesseract from 'tesseract.js';
 import { jsPDF } from 'jspdf';
+
+// OCR.space API - Get free key at https://ocr.space/ocrapi
+const OCR_API_URL = 'https://api.ocr.space/parse/image';
 
 interface ImageItem {
   id: string;
   uri: string;
   name: string;
+  file: File | null;
   extractedText: string;
   isProcessing: boolean;
   isProcessed: boolean;
@@ -26,7 +30,27 @@ const PDFConverterScreen = () => {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [progress, setProgress] = useState<string>('');
+  const [apiKey, setApiKey] = useState<string>('');
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load API key from localStorage on mount
+  React.useEffect(() => {
+    if (Platform.OS === 'web') {
+      const savedKey = localStorage.getItem('@studyg_ocr_api_key');
+      if (savedKey) {
+        setApiKey(savedKey);
+      }
+    }
+  }, []);
+
+  const saveApiKey = (key: string) => {
+    setApiKey(key);
+    if (Platform.OS === 'web') {
+      localStorage.setItem('@studyg_ocr_api_key', key);
+    }
+    setShowApiKeyInput(false);
+  };
 
   const handleSelectImages = () => {
     if (Platform.OS === 'web' && fileInputRef.current) {
@@ -48,6 +72,7 @@ const PDFConverterScreen = () => {
         id: `${Date.now()}-${i}`,
         uri,
         name: file.name,
+        file: file, // Store the file for OCR API
         extractedText: '',
         isProcessing: false,
         isProcessed: false,
@@ -63,39 +88,56 @@ const PDFConverterScreen = () => {
   };
 
   const processImage = async (imageId: string) => {
+    if (!apiKey) {
+      setShowApiKeyInput(true);
+      alert('Lütfen önce OCR API anahtarınızı girin. Ücretsiz anahtar için: https://ocr.space/ocrapi');
+      return;
+    }
+
     setImages(prev => prev.map(img =>
       img.id === imageId ? { ...img, isProcessing: true } : img
     ));
 
     const image = images.find(img => img.id === imageId);
-    if (!image) return;
+    if (!image || !image.file) return;
 
     try {
       setProgress(`"${image.name}" işleniyor...`);
 
-      const result = await Tesseract.recognize(
-        image.uri,
-        'tur+eng', // Turkish + English
-        {
-          logger: (m) => {
-            if (m.status === 'recognizing text') {
-              setProgress(`"${image.name}" - %${Math.round(m.progress * 100)}`);
-            }
-          },
-        }
-      );
+      // Create form data for OCR.space API
+      const formData = new FormData();
+      formData.append('file', image.file);
+      formData.append('apikey', apiKey);
+      formData.append('language', 'tur'); // Turkish
+      formData.append('isOverlayRequired', 'false');
+      formData.append('detectOrientation', 'true');
+      formData.append('scale', 'true');
+      formData.append('OCREngine', '2'); // Engine 2 is better for handwriting
+
+      const response = await fetch(OCR_API_URL, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (result.IsErroredOnProcessing) {
+        throw new Error(result.ErrorMessage || 'OCR işlemi başarısız');
+      }
+
+      const extractedText = result.ParsedResults?.[0]?.ParsedText || '';
 
       setImages(prev => prev.map(img =>
         img.id === imageId
-          ? { ...img, extractedText: result.data.text, isProcessing: false, isProcessed: true }
+          ? { ...img, extractedText: extractedText.trim(), isProcessing: false, isProcessed: true }
           : img
       ));
       setProgress('');
-    } catch (error) {
+    } catch (error: any) {
       console.error('OCR error:', error);
       setImages(prev => prev.map(img =>
         img.id === imageId
-          ? { ...img, extractedText: 'Metin okunamadı', isProcessing: false, isProcessed: true }
+          ? { ...img, extractedText: `Hata: ${error.message || 'Metin okunamadı'}`, isProcessing: false, isProcessed: true }
           : img
       ));
       setProgress('');
@@ -237,11 +279,46 @@ const PDFConverterScreen = () => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>PDF Dönüştürücü</Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>PDF Dönüştürücü</Text>
+            <TouchableOpacity
+              style={styles.apiKeyButton}
+              onPress={() => setShowApiKeyInput(!showApiKeyInput)}
+            >
+              <Text style={styles.apiKeyButtonText}>
+                {apiKey ? '🔑 ✓' : '🔑 Ayarla'}
+              </Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.subtitle}>
             Görsellerden metin çıkarıp PDF oluşturun
           </Text>
         </View>
+
+        {/* API Key Input */}
+        {showApiKeyInput && (
+          <View style={styles.apiKeyContainer}>
+            <Text style={styles.apiKeyLabel}>OCR API Anahtarı</Text>
+            <Text style={styles.apiKeyHelp}>
+              Ücretsiz anahtar için: ocr.space/ocrapi
+            </Text>
+            <TextInput
+              style={styles.apiKeyInput}
+              placeholder="API anahtarınızı girin..."
+              placeholderTextColor={colors.textSecondary}
+              value={apiKey}
+              onChangeText={setApiKey}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              style={styles.apiKeySaveButton}
+              onPress={() => saveApiKey(apiKey)}
+            >
+              <Text style={styles.apiKeySaveButtonText}>Kaydet</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Hidden file input for web */}
         {Platform.OS === 'web' && (
@@ -389,7 +466,64 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxxl,
   },
   header: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  apiKeyButton: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  apiKeyButtonText: {
+    fontSize: fontSize.sm,
+    color: colors.text,
+  },
+  apiKeyContainer: {
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.primary + '30',
+  },
+  apiKeyLabel: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semiBold,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  apiKeyHelp: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+  },
+  apiKeyInput: {
+    backgroundColor: colors.background,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    fontSize: fontSize.md,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.sm,
+  },
+  apiKeySaveButton: {
+    backgroundColor: colors.primary,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  apiKeySaveButtonText: {
+    color: colors.onPrimary,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semiBold,
   },
   title: {
     fontSize: fontSize.xxl,
