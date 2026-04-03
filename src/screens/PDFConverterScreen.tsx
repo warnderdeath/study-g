@@ -22,10 +22,13 @@ interface ImageItem {
   uri: string;
   name: string;
   file: File | null;
+  base64: string; // Store base64 for persistence
   extractedText: string;
   isProcessing: boolean;
   isProcessed: boolean;
 }
+
+const STORAGE_KEY = '@studyg_pdf_images';
 
 const PDFConverterScreen = () => {
   const [images, setImages] = useState<ImageItem[]>([]);
@@ -35,19 +38,54 @@ const PDFConverterScreen = () => {
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load API key from localStorage on mount, or use default
+  // Load API key and saved images from localStorage on mount
   React.useEffect(() => {
     if (Platform.OS === 'web') {
+      // Load API key
       const savedKey = localStorage.getItem('@studyg_ocr_api_key');
       if (savedKey) {
         setApiKey(savedKey);
       } else {
         setApiKey(DEFAULT_API_KEY);
       }
+
+      // Load saved images
+      const savedImages = localStorage.getItem(STORAGE_KEY);
+      if (savedImages) {
+        try {
+          const parsed = JSON.parse(savedImages);
+          // Restore images with base64 as uri (file will be null but we have base64)
+          const restored = parsed.map((img: any) => ({
+            ...img,
+            uri: img.base64 || img.uri,
+            file: null, // File can't be restored, but we have base64
+            isProcessing: false,
+          }));
+          setImages(restored);
+        } catch (e) {
+          console.error('Error loading saved images:', e);
+        }
+      }
     } else {
       setApiKey(DEFAULT_API_KEY);
     }
   }, []);
+
+  // Save images to localStorage whenever they change
+  React.useEffect(() => {
+    if (Platform.OS === 'web' && images.length > 0) {
+      const toSave = images.map(img => ({
+        id: img.id,
+        name: img.name,
+        base64: img.base64,
+        extractedText: img.extractedText,
+        isProcessed: img.isProcessed,
+      }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    } else if (Platform.OS === 'web' && images.length === 0) {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [images]);
 
   const saveApiKey = (key: string) => {
     setApiKey(key);
@@ -63,6 +101,15 @@ const PDFConverterScreen = () => {
     }
   };
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -71,13 +118,14 @@ const PDFConverterScreen = () => {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const uri = URL.createObjectURL(file);
+      const base64 = await fileToBase64(file);
 
       newImages.push({
         id: `${Date.now()}-${i}`,
-        uri,
+        uri: base64,
         name: file.name,
-        file: file, // Store the file for OCR API
+        file: file,
+        base64: base64, // Store base64 for persistence
         extractedText: '',
         isProcessing: false,
         isProcessed: false,
@@ -92,6 +140,18 @@ const PDFConverterScreen = () => {
     }
   };
 
+  const base64ToBlob = (base64: string): Blob => {
+    const parts = base64.split(',');
+    const mime = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
+    const bstr = atob(parts[1]);
+    const n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      u8arr[i] = bstr.charCodeAt(i);
+    }
+    return new Blob([u8arr], { type: mime });
+  };
+
   const processImage = async (imageId: string) => {
     if (!apiKey) {
       setShowApiKeyInput(true);
@@ -104,14 +164,25 @@ const PDFConverterScreen = () => {
     ));
 
     const image = images.find(img => img.id === imageId);
-    if (!image || !image.file) return;
+    if (!image) return;
+
+    // If no file but we have base64, create blob from base64
+    if (!image.file && !image.base64) return;
 
     try {
       setProgress(`"${image.name}" işleniyor...`);
 
       // Create form data for OCR.space API
       const formData = new FormData();
-      formData.append('file', image.file);
+
+      // Use file if available, otherwise create blob from base64
+      if (image.file) {
+        formData.append('file', image.file);
+      } else if (image.base64) {
+        const blob = base64ToBlob(image.base64);
+        formData.append('file', blob, image.name);
+      }
+
       formData.append('apikey', apiKey);
       formData.append('language', 'tur'); // Turkish
       formData.append('isOverlayRequired', 'false');
